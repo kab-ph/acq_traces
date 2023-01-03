@@ -25,7 +25,7 @@ class acq:
                 self.pack += 1
 
     def buff_init(self):
-        self.buff = np.zeros((self.chunk, self.chunk), dtype='int8')
+        self.buff = np.zeros((self.chunk, self.no_samples), dtype='int8')
 
     def save_trace(self, trace):
         self.buff[self.count] = trace
