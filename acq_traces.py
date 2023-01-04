@@ -5,8 +5,8 @@ import h5py
 import os
 from scipy import fft
 from scipy import signal
-
-
+import statistics
+import scipy.stats as stats
 
 class acq:
     def __init__(self, no_samples, chunk):
@@ -43,13 +43,13 @@ class acq:
 
 
 class Leakeges:
-    def __init__(self, dest):
-        self.dir = 'leakages//0.h5'
+    def __init__(self, dest ):
+        self.dir = dest + '//0.h5'
         self.f = h5py.File(self.dir, 'r')
         self.buff = self.f['leakages'][:]
         self.rows, self.col = self.buff.shape
         self.count = len(os.listdir('leakages'))
-        self.traces = np.zeros(((self.count * self.rows), self.col))
+        self.traces = np.zeros(((self.count * self.rows), self.col), dtype='int8')
 
     def read(self):
         for i in tqdm(range(self.count)):
@@ -87,13 +87,52 @@ class alignment:
         return self.peak_position
 
 
+class TracesProcessing:
+    def ttest(self, group_a, group_b):
+        n_a = len(group_a)
+        n_b = len(group_b)
+        ttest_value = np.zeros(group_a.shape[1])
+        for i in tqdm(range(group_a.shape[1])):
+            avg_a = np.average(group_a[:, i])
+            avg_b = np.average(group_b[:, i])
+            std_a2 = (np.std(group_a[:, i])) ** 2
+            std_b2 = (np.std(group_b[:, i])) ** 2
+            upper = avg_a - avg_b
+            lower = np.sqrt((std_a2 / n_a) + (std_b2 / n_b))
+            ttest_value[i] = upper / lower
+            # ttest_value[i] = stats.ttest_ind(group_a[:, i], group_b[:, i], equal_var=False)[1]
+        return ttest_value
+
+    def var(self, group_a):
+        n_a = len(group_a)
+        var = np.zeros(group_a.shape[1])
+        for i in tqdm(range(group_a.shape[1])):
+            var[i] = np.var(group_a[:, i])
+        return var
+
+
+
+def run_test():
+    f = h5py.File('19.h5', 'r')
+    f = f['leakages'][:]
+    group_a = f[0:2500]
+    group_b = f[2500:]
+    # group_a = np.random.randint(200, size=(100, 100))
+    # group_b = np.random.randint(200, size=(100, 100))
+    w = wlc_ttest()
+    ttest = w.ttest(group_a, group_b)
+    fig, (ax1, ax2) = plt.subplots(2)
+    ax1.plot(np.average(f, axis=0))
+    ax2.plot(ttest)
+    plt.show()
+
 
 def write_traces():
-    chunck = 500
+    chunck = 5
     no_samples = 200
     a = acq(no_samples, chunck)
-    for i in tqdm(range(2000)):
-        trace = np.random.uniform(20, size=500)
+    for i in tqdm(range(15)):
+        trace = np.random.uniform(20, size=200)
         a.save_trace(trace)
 
 def read_traces():
@@ -115,18 +154,22 @@ def align_traces():
     for x, y in enumerate(f):
         indexMax = a.align_trace(ref, y, norm=True, visulize=False)
         # print('index', indexMax)
-        aligned_traces[x] = y[indexMax : indexMax + 20600]
+        aligned_traces[x] = y[indexMax:indexMax + 20600]
 
-    for i in range(50):
-        plt.plot(aligned_traces[i])
+    # for i in range(50):
+    #     plt.plot(aligned_traces[i])
+    # plt.show()
+
+    w = TracesProcessing()
+    ttest = w.ttest(aligned_traces[0:2000], aligned_traces[2000:4000])
+    fig, (ax1, ax2) = plt.subplots(2)
+    ax1.plot(np.average(aligned_traces, axis=0))
+    ax2.plot(ttest)
     plt.show()
 
 
-
-
-
-
 if __name__ == "__main__":
-    # traces = read_traces()
+    traces = read_traces()
     # write_traces()
-    align_traces()
+    # align_traces()
+    # run_test()
